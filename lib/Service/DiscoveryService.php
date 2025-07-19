@@ -9,13 +9,13 @@ declare(strict_types=1);
 
 namespace OCA\UserOIDC\Service;
 
-use OCP\ICache;
-use OCP\ICacheFactory;
-use Psr\Log\LoggerInterface;
-use OCA\UserOIDC\Db\Provider; 
+use OCA\UserOIDC\Db\Provider;
 use OCA\UserOIDC\Helper\HttpClientHelper;
 use OCA\UserOIDC\Vendor\Firebase\JWT\JWK;
 use OCA\UserOIDC\Vendor\Firebase\JWT\JWT;
+use OCP\ICache;
+use OCP\ICacheFactory;
+use Psr\Log\LoggerInterface;
 
 class DiscoveryService
 {

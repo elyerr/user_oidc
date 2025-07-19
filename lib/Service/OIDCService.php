@@ -9,11 +9,10 @@ declare(strict_types=1);
 
 namespace OCA\UserOIDC\Service;
 
-use Throwable;
-use OCP\Security\ICrypto;
-use Psr\Log\LoggerInterface;
 use OCA\UserOIDC\Db\Provider;
 use OCA\UserOIDC\Helper\HttpClientHelper;
+use OCP\Security\ICrypto;
+use Psr\Log\LoggerInterface; 
 
 class OIDCService
 {
@@ -40,7 +39,7 @@ class OIDCService
 			],
 		];
 		try {
-			return json_decode($this->clientService->get($url, $options), true);
+			return json_decode($this->clientService->get($url, [], $options), true);
 		} catch (Throwable $e) {
 			return [];
 		}
