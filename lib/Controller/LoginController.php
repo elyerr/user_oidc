@@ -89,7 +89,7 @@ class LoginController extends BaseOidcController
 		private TokenService $tokenService,
 		private OidcService $oidcService,
 	) {
-		parent::__construct($request, $config);
+		parent::__construct($request, $config, $l10n);
 	}
 
 	/**
@@ -108,12 +108,10 @@ class LoginController extends BaseOidcController
 	private function buildProtocolErrorResponse(?bool $throttle = null): TemplateResponse
 	{
 		$params = [
-			'errors' => [
-				['error' => $this->l10n->t('You must access Nextcloud with HTTPS to use OpenID Connect.')],
-			],
+			'message' => $this->l10n->t('You must access Nextcloud with HTTPS to use OpenID Connect.'),
 		];
 		$throttleMetadata = ['reason' => 'insecure connection'];
-		return $this->buildFailureTemplateResponse('', 'error', $params, Http::STATUS_NOT_FOUND, $throttleMetadata, $throttle);
+		return $this->buildFailureTemplateResponse($params, Http::STATUS_NOT_FOUND, $throttleMetadata, $throttle);
 	}
 
 	/**
@@ -334,8 +332,14 @@ class LoginController extends BaseOidcController
 			return $this->build403TemplateResponse($message, Http::STATUS_BAD_REQUEST, [], false);
 		}
 
-		if ($this->session->get(self::STATE) !== $state) {
-			$this->logger->debug('state does not match');
+		$storedState = $this->session->get(self::STATE);
+
+		if ($storedState !== $state) {
+			$this->logger->warning('state does not match', [
+				'got' => $state,
+				'expected' => $storedState,
+				'state_exists_in_session' => $this->session->exists(self::STATE),
+			]);
 
 			$message = $this->l10n->t('The received state does not match the expected value.');
 			if ($this->isDebugModeEnabled()) {
@@ -343,7 +347,8 @@ class LoginController extends BaseOidcController
 					'error' => 'invalid_state',
 					'error_description' => $message,
 					'got' => $state,
-					'expected' => $this->session->get(self::STATE),
+					'expected' => $storedState,
+					'state_exists_in_session' => $this->session->exists(self::STATE),
 				];
 				return new JSONResponse($responseData, Http::STATUS_FORBIDDEN);
 			}
@@ -383,10 +388,10 @@ class LoginController extends BaseOidcController
 			$tokenEndpointAuthMethod = 'client_secret_post';
 			// Use Basic only if client_secret_post is not available as supported by the endpoint
 			if (
-				array_key_exists('token_endpoint_auth_methods_supported', $discovery) &&
-				is_array($discovery['token_endpoint_auth_methods_supported']) &&
-				in_array('client_secret_basic', $discovery['token_endpoint_auth_methods_supported']) &&
-				!in_array('client_secret_post', $discovery['token_endpoint_auth_methods_supported'])
+				array_key_exists('token_endpoint_auth_methods_supported', $discovery)
+				&& is_array($discovery['token_endpoint_auth_methods_supported'])
+				&& in_array('client_secret_basic', $discovery['token_endpoint_auth_methods_supported'])
+				&& !in_array('client_secret_post', $discovery['token_endpoint_auth_methods_supported'])
 			) {
 				$tokenEndpointAuthMethod = 'client_secret_basic';
 			}

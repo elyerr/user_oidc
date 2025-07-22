@@ -2,6 +2,8 @@ OC.L10N.register(
     "user_oidc",
     {
     "Login with %1s" : "Σύνδεση με %1s",
+    "Error" : "Σφάλμα",
+    "Access forbidden" : "Απαγορεύεται η πρόσβαση",
     "ID4Me is disabled" : "Το ID4Me είναι απενεργοποιημένο",
     "Invalid OpenID domain" : "Μη έγκυρος τομέας OpenID",
     "Invalid authority issuer" : "Μη έγκυρος εκδότης αρχής",
@@ -47,6 +49,7 @@ OC.L10N.register(
     "Update provider" : "Ενημέρωση παρόχου",
     "Confirm deletion" : "Επιβεβαίωση διαγραφής",
     "Cancel" : "Ακύρωση",
+    "Delete" : "Διαγραφή",
     "Submit" : "Υποβολή",
     "Client configuration" : "Διαμόρφωση πελάτη",
     "Identifier (max 128 characters)" : "Αναγνωριστικό (μέγιστο 128 χαρακτήρες)",

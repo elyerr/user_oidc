@@ -23,21 +23,20 @@ class HttpClientHelper implements HttpClient
 	) {
 	}
 
-	public function get($url, array $options = [])
-	{
+	public function get($url, array $headers = [], array $options = []) {
 		$oidcConfig = $this->config->getSystemValue('user_oidc', []);
 
 		$client = $this->clientService->newClient();
 
-		if ($oidcConfig['httpclient.allowselfsigned']) {
+		if (isset($oidcConfig['httpclient.allowselfsigned'])
+			&& !in_array($oidcConfig['httpclient.allowselfsigned'], [false, 'false', 0, '0'], true)) {
 			$options['verify'] = false;
 		}
 
 		return $client->get($url, $options)->getBody();
 	}
 
-	public function post($url, $body, array $headers = [])
-	{
+	public function post($url, $body, array $headers = []) {
 		$oidcConfig = $this->config->getSystemValue('user_oidc', []);
 		$client = $this->clientService->newClient();
 
@@ -46,7 +45,8 @@ class HttpClientHelper implements HttpClient
 			'body' => $body,
 		];
 
-		if ($oidcConfig['httpclient.allowselfsigned']) {
+		if (isset($oidcConfig['httpclient.allowselfsigned'])
+			&& !in_array($oidcConfig['httpclient.allowselfsigned'], [false, 'false', 0, '0'], true)) {
 			$options['verify'] = false;
 		}
 
