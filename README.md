@@ -2,6 +2,7 @@
   - SPDX-FileCopyrightText: 2021 Nextcloud GmbH and Nextcloud contributors
   - SPDX-License-Identifier: AGPL-3.0-or-later
 -->
+
 # user_oidc
 
 [![REUSE status](https://api.reuse.software/badge/github.com/nextcloud/user_oidc)](https://api.reuse.software/info/github.com/nextcloud/user_oidc)
@@ -9,6 +10,7 @@
 OpenID Connect user backend for Nextcloud
 
 ## General usage
+
 See [Nextcloud and OpenID-Connect](https://web.archive.org/web/20240412121655/https://www.schiessle.org/articles/2023/07/04/nextcloud-and-openid-connect/)
 for a proper jumpstart.
 
@@ -25,8 +27,8 @@ for a proper jumpstart.
 This configuration allows Nextcloud to **trust self-signed SSL certificates** when making HTTP requests through the internal HTTP client.
 It is especially useful when your OAuth2 or OIDC provider is hosted locally or uses a self-signed certificate not recognized by public CAs.
 
-* **true**: Disables SSL certificate verification (adds the `verify => false` option to the actual HTTP client)
-* **false** (default): SSL verification remains enabled and strict
+-   **true**: Disables SSL certificate verification (adds the `verify => false` option to the actual HTTP client)
+-   **false** (default): SSL verification remains enabled and strict
 
 > ⚠️ Use with caution in production environments, as disabling certificate verification can introduce security risks.
 
@@ -44,10 +46,10 @@ This option allows customizing the `prompt` parameter sent in the OAuth2/OIDC au
 
 Supported values include:
 
-* `none`
-* `login`
-* `consent`
-* `internal` (custom)
+-   `none`
+-   `login`
+-   `consent`
+-   `internal` (custom)
 
 The `internal` prompt is specific to **[OAuth2 Passport Server](https://github.com/elyerr/oauth2-passport-server)** and is designed to enable seamless login
 for private or internal applications without requiring user consent or interaction.
@@ -57,6 +59,18 @@ Documentation for all supported prompt values is available here:
 
 ---
 
+### 🔐 Token creation
+
+To enable proper session handling and user authentication, you must explicitly allow the creation of the user_oidc login token in the session. This is required for the authentication flow to function correctly.
+
+Add the following configuration to your config/config.php file:
+
+```php
+'user_oidc' => [
+     'store_login_token' => true,
+]
+```
+
 ### User IDs
 
 The OpenID Connect backend will ensure that user ids are unique even when multiple providers would report the same user
@@ -64,22 +78,27 @@ id to ensure that a user cannot identify for the same Nextcloud account through 
 Therefore, a hash of the provider id and the user id is used. This behaviour can be turned off in the provider options.
 
 ## Commandline settings
+
 The app could also be configured by commandline.
 
 ### Provider entries
+
 Providers are located by provider identifier.
 
 To list all configured providers, use:
+
 ```
 sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider
 ```
 
 To show detailed provider configuration, use:
+
 ```
 sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider demoprovider
 ```
 
 A provider is created if none with the given identifier exists and all parameters are given:
+
 ```
 sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider demoprovider --clientid="WBXCa003871" \
     --clientsecret="lbXy***********" --discoveryuri="https://accounts.example.com/openid-configuration"
@@ -88,14 +107,16 @@ sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider demoprovider --cl
 Other options like attribute mappings or group provisioning can be optionally specified. For more details refer to `occ user_oidc:provider --help`.
 
 To delete a provider, use:
+
 ```
 sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider:delete demoprovider
   Are you sure you want to delete OpenID Provider demoprovider
   and may invalidate all assiciated user accounts.
 ```
+
 To skip the confirmation, use `--force`.
 
-***Warning***: be careful with the deletion of a provider because in some setup, this invalidates access to all
+**_Warning_**: be careful with the deletion of a provider because in some setup, this invalidates access to all
 NextCloud accounts associated with this provider.
 
 #### Avatar support
@@ -109,11 +130,13 @@ The image should be in JPG or PNG format and have the same width and height.
 You can set a custom label for the buttons in the login page.
 
 Set this value in `config.php`:
-``` php
+
+```php
 'user_oidc' => [
     'login_label' => 'Connect with {name}',
 ],
 ```
+
 This custom label won't be translated.
 
 ### Disable default claims
@@ -122,7 +145,8 @@ Even if you don't map any attribute for quota, display name, email or groups, th
 ask for the 'quota', 'name', 'email', 'groups' claims and map them to an attribute with the same name.
 
 To change this behaviour and disable the default claims, you can change this value in `config.php`:
-``` php
+
+```php
 'user_oidc' => [
     'enable_default_claims' => false,
 ],
@@ -135,7 +159,8 @@ in the OpenId client settings (in Nextcloud's admin settings).
 
 If some user information is not in your login ID tokens but can be obtained with the userinfo endpoint, just enable
 `enrich_login_id_token_with_userinfo` in config.php. This is disabled by default.
-``` php
+
+```php
 'user_oidc' => [
     'enrich_login_id_token_with_userinfo' => true,
 ],
@@ -147,12 +172,15 @@ This will only work on login and not when validating a bearer token
 because provisioning when validating a bearer access token is not supported yet.
 
 ### ID4me option
+
 ID4me is an application setting switch which is configurable as normal Nextcloud app setting:
+
 ```
 sudo -u www-data php /var/www/nextcloud/occ config:app:set --value=1 user_oidc id4me_enabled
 ```
 
 ### Disable other login methods
+
 If there is only one OpenID Connect provider configured, it can be made the default login
 method and the user would get redirected to the provider immediately for the
 login. Admins can still use the regular login through adding the `?direct=1`
@@ -169,7 +197,8 @@ https://datatracker.ietf.org/doc/html/rfc7636
 Unless PKCE is not supported by the configured OpenID Connect provider,
 it is enabled by default.
 You can also manually disable it in `config.php`:
-``` php
+
+```php
 'user_oidc' => [
     'use_pkce' => false,
 ],
@@ -181,7 +210,8 @@ Single logout is enabled by default. When logging out of Nextcloud,
 the end_session_endpoint of the OpenID Connect provider is requested to end the session on this side.
 
 It can be disabled in `config.php`:
-``` php
+
+```php
 'user_oidc' => [
     'single_logout' => false,
 ],
@@ -191,11 +221,12 @@ It can be disabled in `config.php`:
 
 [OpenId backchannel logout](https://openid.net/specs/openid-connect-backchannel-1_0.html) is supported by this app.
 You just have to configure 2 settings for the OpenId client (on the provider side, Keycloak for example):
+
 1. Backchannel Logout URL: If your Nextcloud base URL is https://my.nextcloud.org
-and your OpenId provider identifier (on the Nextcloud side) is "myOidcProvider"
-set the backchannel Logout URL to
-https://my.nextcloud.org/index.php/apps/user_oidc/backchannel-logout/myOidcProvider .
-This URL is provided for each provider in the OpenID Connect admin settings.
+   and your OpenId provider identifier (on the Nextcloud side) is "myOidcProvider"
+   set the backchannel Logout URL to
+   https://my.nextcloud.org/index.php/apps/user_oidc/backchannel-logout/myOidcProvider .
+   This URL is provided for each provider in the OpenID Connect admin settings.
 2. Enable the "Backchannel Logout Session Required" setting.
 
 ### Auto provisioning
@@ -209,7 +240,8 @@ take care of user creation and attribute mapping.
 This leaves user_oidc to only take care of authentication.
 
 Auto provisioning can be disabled in `config.php`:
-``` php
+
+```php
 'user_oidc' => [
     'auto_provision' => false,
 ],
@@ -221,11 +253,12 @@ Even if LDAP does not handle the login process,
 the user_oidc app will trigger an LDAP search when logging in to make sure the user is created if it was
 not synced already.
 So it is essential that:
-* the OpenID Connect "User ID mapping" attribute matches the LDAP Expert tab's "Internal Username".
-The attribute names can be different but their values should match. Do not change the LDAP configuration,
-simply adapt the OpenID Connect provider configuration.
-* the OpenID Connect "User ID mapping" attribute can be used in the LDAP login query
-defined in the "Login Attributes" tab.
+
+-   the OpenID Connect "User ID mapping" attribute matches the LDAP Expert tab's "Internal Username".
+    The attribute names can be different but their values should match. Do not change the LDAP configuration,
+    simply adapt the OpenID Connect provider configuration.
+-   the OpenID Connect "User ID mapping" attribute can be used in the LDAP login query
+    defined in the "Login Attributes" tab.
 
 In other words, make sure that your OpenID Connect provider's "User ID mapping" setting is set to an attribute
 which provides the same values as the LDAP attribute set in "Internal Username" in your LDAP settings.
@@ -239,19 +272,20 @@ this is possible with **soft** auto provisioning.
 
 There is a `soft_auto_provision` system config flag that is enabled by default and is effective only if `auto_provision`
 is enabled.
-``` php
+
+```php
 'user_oidc' => [
     'auto_provision' => true, // default: true
     'soft_auto_provision' => true, // default: true
 ],
 ```
 
-* When `soft_auto_provision` is enabled
-  * If the user already exists in another backend, we don't create a new one in the user_oidc backend.
-    We update the information (mapped attributes) of the existing user.
-    If the user does not exist in another backend, we create it in the user_oidc backend
-* When `soft_auto_provision` is disabled
-  * We refuse Oidc login of users that already exist in other backends
+-   When `soft_auto_provision` is enabled
+    -   If the user already exists in another backend, we don't create a new one in the user_oidc backend.
+        We update the information (mapped attributes) of the existing user.
+        If the user does not exist in another backend, we create it in the user_oidc backend
+-   When `soft_auto_provision` is disabled
+    -   We refuse Oidc login of users that already exist in other backends
 
 #### Soft auto provisioning without user creation
 
@@ -262,7 +296,8 @@ user backend BUT you still want user_oidc to set the user information according 
 For that, there is a `disable_account_creation` system config flag that is false by default and is effective
 only if `auto_provision` and `soft_auto_provision` are enabled
 is enabled.
-``` php
+
+```php
 'user_oidc' => [
     'auto_provision' => true, // default: true
     'soft_auto_provision' => true, // default: true
@@ -272,36 +307,36 @@ is enabled.
 
 ### 4 Provisioning scenarios
 
-* Create users if they don't exist
-    * Accept connection of existing users (from other backends) and update their attributes:
-      ``` php
-      'user_oidc' => [
-          'auto_provision' => true, // default: true
-          'soft_auto_provision' => true, // default: true
-      ],
-      ```
-    * Do not accept connection of users existing in other backends:
-	  ``` php
-	  'user_oidc' => [
-		  'auto_provision' => true, // default: true
-		  'soft_auto_provision' => false, // default: true
-	  ],
-	  ```
-* Do not create users if they don't exist
-    * Update attributes of existing users (create by user_oidc or any other backend):
-	  ``` php
-	  'user_oidc' => [
-	  	'auto_provision' => true, // default: true
-	  	'soft_auto_provision' => true, // default: true
-	  	'disable_account_creation' => true, // default: false
-	  ],
-	  ```
-    * Do not update attributes of existing users:
-      ``` php
-      'user_oidc' => [
-          'auto_provision' => false, // default: true
-      ],
-      ```
+-   Create users if they don't exist
+    -   Accept connection of existing users (from other backends) and update their attributes:
+        ```php
+        'user_oidc' => [
+            'auto_provision' => true, // default: true
+            'soft_auto_provision' => true, // default: true
+        ],
+        ```
+    -   Do not accept connection of users existing in other backends:
+    ```php
+    'user_oidc' => [
+    	  'auto_provision' => true, // default: true
+    	  'soft_auto_provision' => false, // default: true
+    ],
+    ```
+-   Do not create users if they don't exist
+    -   Update attributes of existing users (create by user_oidc or any other backend):
+    ```php
+    'user_oidc' => [
+    	'auto_provision' => true, // default: true
+    	'soft_auto_provision' => true, // default: true
+    	'disable_account_creation' => true, // default: false
+    ],
+    ```
+    -   Do not update attributes of existing users:
+        ```php
+        'user_oidc' => [
+            'auto_provision' => false, // default: true
+        ],
+        ```
 
 ### Pre-provisioning
 
@@ -309,7 +344,7 @@ If you need the users to exist before they authenticate for the first time
 (because you want other users to be able to share files with them, for example)
 you can pre-provision them with the user_oidc API:
 
-``` bash
+```bash
 curl -H "ocs-apirequest: true" -u admin:admin -X POST -H "content-type: application/json" \
   -d '{"providerId":2,"userId":"new_user","displayName":"New User","email":"new@user.org","quota":"5GB"}' \
   https://my.nextcloud.org/ocs/v2.php/apps/user_oidc/api/v1/user
@@ -319,7 +354,7 @@ Only the `providerId` and `userId` parameters are mandatory.
 
 You can also delete users managed by user_oidc with this API endpoint:
 
-``` bash
+```bash
 curl -H "ocs-apirequest: true" -u admin:admin -X DELETE
   https://my.nextcloud.org/ocs/v2.php/apps/user_oidc/api/v1/user/USER_ID
 ```
@@ -331,7 +366,8 @@ It is possible that they don't contain the user ID attribute. In this case, this
 can be requested to the provider's `userinfo` endpoint.
 
 Add this to `config.php` to enable such extra validation step:
-``` php
+
+```php
 'user_oidc' => [
     'userinfo_bearer_validation' => true,
 ],
@@ -339,7 +375,8 @@ Add this to `config.php` to enable such extra validation step:
 
 If you only want the token to be validated against the `userinfo` endpoint,
 it is possible to disable the classic "self-encoded" validation:
-``` php
+
+```php
 'user_oidc' => [
     'userinfo_bearer_validation' => true,
     'selfencoded_bearer_validation' => false,
@@ -347,19 +384,22 @@ it is possible to disable the classic "self-encoded" validation:
 ```
 
 If you want to ask the [OIDC Identity Provider app](https://apps.nextcloud.com/apps/oidc) to validate a bearer token:
-``` php
+
+```php
 'user_oidc' => [
     'oidc_provider_bearer_validation' => true,
 ],
 ```
+
 This requires the OIDC Identity Provider app >= v1.4.0 . Access tokens and JWT tokens can be validated.
 
 ### Group provisioning
 
 You can configure each provider:
-* Toggle group provisioning (creates nonexisting groups on login)
-* Set the group whitelist regular expression (nonmatching groups will be kept untouched)
-* Toggle login restriction to people who don't belong to any whitelisted group
+
+-   Toggle group provisioning (creates nonexisting groups on login)
+-   Set the group whitelist regular expression (nonmatching groups will be kept untouched)
+-   Toggle login restriction to people who don't belong to any whitelisted group
 
 This can be done in the graphical settings, in the "OpenID Connect" admin settings section or with the occ command to create/update providers:
 
@@ -374,7 +414,8 @@ sudo -u www-data php /var/www/nextcloud/occ user_oidc:provider demoprovider \
 The `audience` and `azp` token claims will be checked when validating a login ID token.
 Only the `audience` will be checked when validating a Bearer token.
 You can disable these checks with these config values (in config.php):
-``` php
+
+```php
 'user_oidc' => [
     'login_validation_audience_check' => false,
     'login_validation_azp_check' => false,
@@ -385,7 +426,8 @@ You can disable these checks with these config values (in config.php):
 ### Disable the user search by email
 
 This app can stop matching users (when a user search is performed in Nextcloud) by setting this config.php value:
-``` php
+
+```php
 'user_oidc' => [
     'user_search_match_emails' => false,
 ],
@@ -406,7 +448,6 @@ custom.nickname | profile.name | name
 
 This will return the first non-empty string from the token in the order defined.
 
-
 #### Enabling this behavior (optional)
 
 To enable support for dot-notation and fallback claims for a specific provider, set the following configuration flag via the Nextcloud command line:
@@ -424,19 +465,20 @@ php occ user_oidc:provider <your-provider-identifier> --resolve-nested-claims=0
 This setting is also available in the web interface when configuring a provider.
 This setting is **disabled by default** to ensure full backward compatibility with existing configurations and flat token structures.
 
-
 ## Building the app
 
 Requirements for building:
-- Node.js 14
-- NPM 7
-- PHP
-- composer
+
+-   Node.js 14
+-   NPM 7
+-   PHP
+-   composer
 
 The app uses [krankerl](https://github.com/ChristophWurst/krankerl) to build the release archive from the git repository.
 The release will be put into `build/artifacts/` when running the `krankerl package`.
 
 The app can also be built without krankerl by manually running:
+
 ```
 composer install --no-dev -o
 npm ci
@@ -444,11 +486,10 @@ npm run build
 ```
 
 On Ubuntu 20.04, a possible way to get build working is with matching npm and node versions is:
+
 ```
 sudo apt-get remove nodejs
 sudo curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
 sudo apt-get install nodejs
 sudo npm install -g npm@7
 ```
-
-
