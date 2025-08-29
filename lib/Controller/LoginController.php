@@ -13,7 +13,6 @@ namespace OCA\UserOIDC\Controller;
 
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
-use OC\Authentication\Exceptions\InvalidTokenException;
 use OC\Authentication\Token\IProvider;
 use OC\User\Session as OC_UserSession;
 use OCA\UserOIDC\AppInfo\Application;
@@ -39,6 +38,7 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Authentication\Exceptions\InvalidTokenException;
 use OCP\Authentication\Token\IToken;
 use OCP\DB\Exception;
 use OCP\EventDispatcher\IEventDispatcher;
@@ -270,9 +270,11 @@ class LoginController extends BaseOidcController {
 			'claims' => json_encode($claims),
 			'state' => $state,
 			'nonce' => $nonce,
-			'prompt' => $oidcConfig['prompt'] ?? 'consent'
 		];
 
+		if (isset($oidcConfig['prompt']) && is_string($oidcConfig['prompt'])) {
+			$data['prompt'] = $oidcConfig['prompt'];
+		}
 
 		if ($isPkceEnabled) {
 			$data['code_challenge'] = $this->toCodeChallenge($code_verifier);
@@ -538,25 +540,25 @@ class LoginController extends BaseOidcController {
 			$this->ldapService->syncUser($userId);
 		}
 
-		$userFromOtherBackend = $this->userManager->get($userId);
-		if ($userFromOtherBackend !== null && $this->ldapService->isLdapDeletedUser($userFromOtherBackend)) {
-			$userFromOtherBackend = null;
+		$existingUser = $this->userManager->get($userId);
+		if ($existingUser !== null && $this->ldapService->isLdapDeletedUser($existingUser)) {
+			$existingUser = null;
 		}
 
 		if ($autoProvisionAllowed) {
-			if (!$softAutoProvisionAllowed && $userFromOtherBackend !== null) {
+			if (!$softAutoProvisionAllowed && $existingUser !== null && $existingUser->getBackendClassName() !== Application::APP_ID) {
 				// if soft auto-provisioning is disabled,
 				// we refuse login for a user that already exists in another backend
 				$message = $this->l10n->t('User conflict');
 				return $this->build403TemplateResponse($message, Http::STATUS_BAD_REQUEST, ['reason' => 'non-soft auto provision, user conflict'], false);
 			}
 			// use potential user from other backend, create it in our backend if it does not exist
-			$provisioningResult = $this->provisioningService->provisionUser($userId, $providerId, $idTokenPayload, $userFromOtherBackend);
+			$provisioningResult = $this->provisioningService->provisionUser($userId, $providerId, $idTokenPayload, $existingUser);
 			$user = $provisioningResult['user'];
 			$this->session->set('user_oidc.oidcUserData', $provisioningResult['userData']);
 		} else {
 			// when auto provision is disabled, we assume the user has been created by another user backend (or manually)
-			$user = $userFromOtherBackend;
+			$user = $existingUser;
 		}
 
 		if ($user === null) {
@@ -778,61 +780,83 @@ class LoginController extends BaseOidcController {
 			);
 		}
 
-		// get the auth token ID associated with the logout token's sid attr
-		$sid = $logoutTokenPayload->sid;
-		try {
-			$oidcSession = $this->sessionMapper->findSessionBySid($sid);
-		} catch (DoesNotExistException $e) {
+		if (!isset($logoutTokenPayload->iss)) {
 			return $this->getBackchannelLogoutErrorResponse(
-				'invalid SID',
-				'The sid of the logout token was not found',
-				['session_sid_not_found' => $sid]
+				'invalid iss',
+				'The logout token should contain an iss attribute',
+				['iss_should_be_set' => true]
 			);
-		} catch (MultipleObjectsReturnedException $e) {
+		}
+		$iss = $logoutTokenPayload->iss;
+
+		if (!isset($logoutTokenPayload->sid) && !isset($logoutTokenPayload->sub)) {
 			return $this->getBackchannelLogoutErrorResponse(
-				'invalid SID',
-				'The sid of the logout token was found multiple times',
-				['multiple_logout_tokens_found' => $sid]
+				'invalid sid+sub',
+				'The logout token should contain sid or sub or both',
+				['no_sid_no_sub' => true]
 			);
 		}
 
-		if (isset($logoutTokenPayload->sub)) {
-			$sub = $logoutTokenPayload->sub;
-			if ($oidcSession->getSub() !== $sub) {
+		$oidcSessionsToKill = [];
+
+		// if SID is set, we look for this specific session (with or without using the sub, depending on if the sub is set)
+		if (isset($logoutTokenPayload->sid)) {
+			$sid = $logoutTokenPayload->sid;
+			$sub = $logoutTokenPayload->sub ?? null;
+			try {
+				$oidcSession = $this->sessionMapper->findSessionBySid($sid, $sub, $iss);
+			} catch (DoesNotExistException $e) {
 				return $this->getBackchannelLogoutErrorResponse(
-					'invalid SUB',
-					'The sub does not match the one from the login ID token',
-					['invalid_sub' => $sub]
+					$sub === null ? 'invalid SID or ISS' : 'invalid SID, SUB or ISS',
+					$sub === null ? 'No session was found for this (sid,iss)' : 'No session was found for this (sid,sub,iss)',
+					['session_not_found' => $sid]
+				);
+			} catch (MultipleObjectsReturnedException $e) {
+				return $this->getBackchannelLogoutErrorResponse(
+					$sub === null ? 'invalid SID or ISS' : 'invalid SID, SUB or ISS',
+					$sub === null ? 'Multiple sessions were found with this (sid,iss)' : 'Multiple sessions were found with this (sid,sub,iss)',
+					['multiple_sessions_found' => $sid]
+				);
+			}
+			$oidcSessionsToKill[] = $oidcSession;
+		} else {
+			// here we know the sid is not set so the sub is set
+			$sub = $logoutTokenPayload->sub;
+			try {
+				$oidcSessionsToKill = $this->sessionMapper->findSessionsBySubAndIss($sub, $iss);
+			} catch (\OCP\Db\Exception $e) {
+				return $this->getBackchannelLogoutErrorResponse(
+					'error with sub+iss',
+					'Failed to retrieve session with sub+iss',
+					['sub_iss_error' => true]
+				);
+			}
+
+			if (empty($oidcSessionsToKill)) {
+				return $this->getBackchannelLogoutErrorResponse(
+					'nothing found with sub+iss',
+					'No session found with sub+iss',
+					['sub_iss_no_session_found' => true]
 				);
 			}
 		}
-		$iss = $logoutTokenPayload->iss;
-		if ($oidcSession->getIss() !== $iss) {
-			return $this->getBackchannelLogoutErrorResponse(
-				'invalid ISS',
-				'The iss does not match the one from the login ID token',
-				['invalid_iss' => $iss]
-			);
-		}
 
-		// i don't know why but the cast is necessary
-		$authTokenId = (int)$oidcSession->getAuthtokenId();
-		try {
-			$authToken = $this->authTokenProvider->getTokenById($authTokenId);
-			// we could also get the auth token by nc session ID
-			// $authToken = $this->authTokenProvider->getToken($oidcSession->getNcSessionId());
-			$userId = $authToken->getUID();
-			$this->authTokenProvider->invalidateTokenById($userId, $authToken->getId());
-		} catch (InvalidTokenException $e) {
-			return $this->getBackchannelLogoutErrorResponse(
-				'nc session not found',
-				'The authentication session was not found in Nextcloud',
-				['nc_auth_session_not_found' => $authTokenId]
-			);
-		}
+		foreach ($oidcSessionsToKill as $oidcSession) {
+			// i don't know why but the cast is necessary
+			$authTokenId = (int)$oidcSession->getAuthtokenId();
+			try {
+				$authToken = $this->authTokenProvider->getTokenById($authTokenId);
+				// we could also get the auth token by nc session ID
+				// $authToken = $this->authTokenProvider->getToken($oidcSession->getNcSessionId());
+				$userId = $authToken->getUID();
+				$this->authTokenProvider->invalidateTokenById($userId, $authToken->getId());
+			} catch (InvalidTokenException $e) {
+				$this->logger->warning('[BackchannelLogout] Nextcloud session not found', ['authtoken_id' => $authTokenId]);
+			}
 
-		// cleanup
-		$this->sessionMapper->delete($oidcSession);
+			// cleanup
+			$this->sessionMapper->delete($oidcSession);
+		}
 
 		return new JSONResponse([], Http::STATUS_OK);
 	}
