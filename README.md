@@ -14,6 +14,11 @@ OpenID Connect user backend for Nextcloud
 See [Nextcloud and OpenID-Connect](https://web.archive.org/web/20240412121655/https://www.schiessle.org/articles/2023/07/04/nextcloud-and-openid-connect/)
 for a proper jumpstart.
 
+## Callback path
+```
+https://cloud.domain.com/index.php/apps/user_oidc/code
+```
+
 ---
 
 ## `user_oidc.httpclient.allowselfsigned`
